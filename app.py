@@ -1,12 +1,8 @@
-from flask import Flask, render_template, request, send_from_directory, url_for
+from flask import Flask, render_template, request, send_file
 from gtts import gTTS
-import os
-import uuid
+from io import BytesIO
 
 app = Flask(__name__)
-
-AUDIO_DIR = "static/audios"
-os.makedirs(AUDIO_DIR, exist_ok=True)
 
 frases_por_defecto = [
     "Hola, ¿cómo estás?",
@@ -17,19 +13,20 @@ frases_por_defecto = [
 @app.route("/", methods=["GET", "POST"])
 def index():
     texto = ""
-    audio_filename = ""
     if request.method == "POST":
         texto = request.form["texto"]
-        if texto.strip():
-            audio_filename = f"{uuid.uuid4()}.mp3"
-            path = os.path.join(AUDIO_DIR, audio_filename)
-            tts = gTTS(text=texto, lang='es', tld='com.mx')
-            tts.save(path)
-    return render_template("index.html", texto=texto, audio_filename=audio_filename, frases=frases_por_defecto)
+    return render_template("index.html", texto=texto, frases=frases_por_defecto)
 
-@app.route("/audio/<filename>")
-def audio(filename):
-    return send_from_directory(AUDIO_DIR, filename)
+@app.route("/audio", methods=["POST"])
+def audio():
+    texto = request.form.get("texto", "")
+    if not texto.strip():
+        return "", 204
+    tts = gTTS(text=texto, lang='es', tld='com.mx')
+    mp3_fp = BytesIO()
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    return send_file(mp3_fp, mimetype="audio/mpeg")
 
 if __name__ == "__main__":
     app.run(debug=True)
